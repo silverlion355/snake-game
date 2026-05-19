@@ -6,4 +6,4 @@ android/app/build/
 *.apk
 *.aab
 platforms/
-plugins/
+plugins/.android/snake-game.keystore
