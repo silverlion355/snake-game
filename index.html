@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>贪吃蛇大作战</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #111;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            touch-action: none;
+        }
+        #gameCanvas { display: block; background: #000; }
+        #ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+        }
+        .ui-item { color: #fff; font-size: 14px; }
+        .ui-item span { color: #7fff00; font-weight: bold; }
+        #muteBtn {
+            position: fixed;
+            top: 50px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #7fff00;
+            background: rgba(0,0,0,0.7);
+            color: #7fff00;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #muteBtn.muted {
+            border-color: #666;
+            color: #666;
+        }
+        #startScreen, #gameOverScreen, #levelCompleteScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .screen-title {
+            font-size: 36px;
+            color: #7fff00;
+            text-shadow: 0 0 15px #7fff00;
+            margin-bottom: 15px;
+        }
+        .screen-subtitle {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 25px;
+            text-align: center;
+            line-height: 1.6;
+            padding: 0 30px;
+        }
+        .save-info {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 15px;
+        }
+        .save-info span { color: #ffd700; }
+        .btn {
+            padding: 12px 35px;
+            font-size: 16px;
+            color: #fff;
+            background: linear-gradient(135deg, #7fff00, #32cd32);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 8px;
+            box-shadow: 0 4px 15px rgba(127, 255, 0, 0.3);
+        }
+        .btn-secondary { background: linear-gradient(135deg, #ffd700, #ff8c00); }
+        #finalScore { font-size: 22px; color: #ffd700; margin: 15px 0; }
+        .hidden { display: none !important; }
+        #levelProgress {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 8px 20px;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 12px;
+            z-index: 10;
+            border: 1px solid #333;
+        }
+        #levelProgress .bar {
+            width: 200px;
+            height: 6px;
+            background: #222;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        #levelProgress .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7fff00, #ffd700);
+            transition: width 0.3s;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        #levelSelect {
+            margin: 20px 0;
+        }
+        .level-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            max-width: 300px;
+        }
+        .level-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            background: #222;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .level-btn.unlocked {
+            border-color: #7fff00;
+            color: #7fff00;
+        }
+        .level-btn.unlocked:hover {
+            background: #7fff00;
+            color: #000;
+        }
+        .level-btn.selected {
+            background: #7fff00;
+            color: #000;
+        }
+        .level-btn.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .author {
+            margin-top: 30px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui">
+        <div class="ui-item">分数: <span id="score">0</span></div>
+        <div class="ui-item">生命: <span id="lives">❤️❤️❤️❤️❤️</span></div>
+        <div class="ui-item">关卡 <span id="levelDisplay">1</span></div>
+        <div class="ui-item">长度 <span id="length">8</span></div>
+    </div>
+
+    <button id="muteBtn" onclick="game.toggleMute()">🔊</button>
+
+    <div id="levelProgress">
+        <span id="progressText">8 / 24</span>
+        <div class="bar"><div class="fill" id="progressFill"></div></div>
+    </div>
+
+    <div id="startScreen">
+        <div class="screen-title">贪吃蛇大作战</div>
+        <div class="save-info">
+            最高关卡: <span id="maxLevelDisplay">1</span> |
+            最高分: <span id="highScoreDisplay">0</span>
+        </div>
+        <div class="screen-subtitle">
+            吃食物变长，消灭AI蛇<br>
+            达到目标长度过关
+        </div>
+        <div id="levelSelect">
+            <div class="level-buttons" id="levelButtons"></div>
+        </div>
+        <div class="btn-group">
+            <button class="btn" onclick="game.start()">开始游戏</button>
+            <button class="btn btn-secondary" onclick="game.resetSave()">重置进度</button>
+        </div>
+        <div class="author">by 飞飞爸</div>
+    </div>
+
+    <div id="gameOverScreen" class="hidden">
+        <div class="screen-title" style="color:#ff4444;">游戏结束</div>
+        <div id="finalScore">分数: 0</div>
+        <div id="finalLength">长度: 0</div>
+        <div class="btn-group">
+            <button class="btn" id="retryBtn" onclick="game.continueLevel()">继续本关</button>
+            <button class="btn btn-secondary" onclick="game.restart()">重新开始</button>
+            <button class="btn" onclick="game.returnToMenu()">返回菜单</button>
+        </div>
+    </div>
+
+    <div id="levelCompleteScreen" class="hidden">
+        <div class="screen-title">关卡完成!</div>
+        <div id="levelCompleteInfo" style="color:#fff;font-size:16px;margin:15px 0;"></div>
+        <button class="btn" onclick="game.nextLevel()">进入下一关</button>
+    </div>
+
+    <script>
+    // ========== 配置 ==========
+    const INITIAL_LENGTH = 8;
+    const LEVELS = [
+        // 初级关卡 (1-6)
+        { name: '草地', targetLength: INITIAL_LENGTH * 3, aiCount: 1, aiSpawnInterval: 15000, speed: 2.0 },
+        { name: '沙漠', targetLength: INITIAL_LENGTH * 4, aiCount: 2, aiSpawnInterval: 12000, speed: 2.2 },
+        { name: '海洋', targetLength: INITIAL_LENGTH * 5, aiCount: 2, aiSpawnInterval: 10000, speed: 2.4 },
+        { name: '夜晚', targetLength: INITIAL_LENGTH * 6, aiCount: 3, aiSpawnInterval: 8000, speed: 2.6 },
+        { name: '霓虹', targetLength: INITIAL_LENGTH * 7, aiCount: 3, aiSpawnInterval: 6000, speed: 2.8 },
+        { name: '终极', targetLength: INITIAL_LENGTH * 8, aiCount: 4, aiSpawnInterval: 5000, speed: 3.0 },
+        // 中级关卡 (7-10)
+        { name: '熔岩', targetLength: INITIAL_LENGTH * 9, aiCount: 4, aiSpawnInterval: 4500, speed: 3.2 },
+        { name: '星空', targetLength: INITIAL_LENGTH * 10, aiCount: 5, aiSpawnInterval: 4000, speed: 3.4 },
+        { name: '深渊', targetLength: INITIAL_LENGTH * 11, aiCount: 5, aiSpawnInterval: 3500, speed: 3.6 },
+        { name: '极寒', targetLength: INITIAL_LENGTH * 12, aiCount: 6, aiSpawnInterval: 3000, speed: 3.8 },
+        // 高级关卡 (11-16)
+        { name: '狂潮', targetLength: INITIAL_LENGTH * 13, aiCount: 6, aiSpawnInterval: 2800, speed: 4.0 },
+        { name: '烈焰', targetLength: INITIAL_LENGTH * 14, aiCount: 7, aiSpawnInterval: 2600, speed: 4.2 },
+        { name: '风暴', targetLength: INITIAL_LENGTH * 15, aiCount: 7, aiSpawnInterval: 2400, speed: 4.4 },
+        { name: '暗影', targetLength: INITIAL_LENGTH * 16, aiCount: 8, aiSpawnInterval: 2200, speed: 4.6 },
+        { name: '雷霆', targetLength: INITIAL_LENGTH * 17, aiCount: 8, aiSpawnInterval: 2000, speed: 4.8 },
+        { name: '末日', targetLength: INITIAL_LENGTH * 18, aiCount: 9, aiSpawnInterval: 1800, speed: 5.0 }
+    ];
+
+    const FOOD_TYPES = [
+        { name: '小苹果', score: 5, color: '#ff6b6b', size: 8, weight: 40 },
+        { name: '苹果', score: 10, color: '#ffd700', size: 10, weight: 30 },
+        { name: '橙子', score: 15, color: '#ff8c00', size: 12, weight: 15 },
+        { name: '葡萄', score: 20, color: '#9932cc', size: 14, weight: 8 },
+        { name: '西瓜', score: 30, color: '#00ff88', size: 16, weight: 5 },
+        { name: '钻石', score: 50, color: '#00ffff', size: 18, weight: 2 }
+    ];
+
+    const SNAKE_SKINS = [
+        { color: '#7fff00', headColor: '#90ff50' },
+        { color: '#00bfff', headColor: '#40dfff' },
+        { color: '#9932cc', headColor: '#ba55d3' },
+        { color: '#ff8c00', headColor: '#ffa500' },
+        { color: '#ff4500', headColor: '#ff6347' },
+        { color: '#ffd700', headColor: '#ffec8b' },
+        { color: '#ff1493', headColor: '#ff69b4' },
+        { color: '#00ff7f', headColor: '#7fff00' },
+        { color: '#9400d3', headColor: '#ba55d3' },
+        { color: '#ff6347', headColor: '#ff7f50' },
+        { color: '#4169e1', headColor: '#6495ed' },
+        { color: '#ff00ff', headColor: '#ff1493' },
+        { color: '#00ffff', headColor: '#7fffd4' },
+        { color: '#dc143c', headColor: '#ff6b6b' },
+        { color: '#ffd700', headColor: '#ffec8b' },
+        { color: '#32cd32', headColor: '#7fff00' }
+    ];
+
+    const MAP_SIZE = 1500;
+    const SEGMENT_SIZE = 12;
+    const TURN_SPEED = 0.15;
+    const VIEW_SCALE = 1.2;
+
+    // ========== 存档系统 ==========
+    const SAVE_KEY = 'snakeGame_save_v3';
+    const MAX_LIVES = 5;
+    function loadSave() {
+        try {
+            const data = localStorage.getItem(SAVE_KEY);
+            if (data) return JSON.parse(data);
+        } catch (e) {}
+        return { version: 1, maxLevel: 0, highScore: 0, lives: MAX_LIVES, levelsSinceLife: 0 };
+    }
+    function saveGame(data) {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    }
+    let saveData = loadSave();
+
+    // ========== 音效 ==========
+    class AudioManager {
+        constructor() {
+            this.ctx = null;
+            this.sfxGain = null;
+            this.bgmGain = null;
+            this.bgmOscillators = [];
+            this.isBGMPlaying = false;
+            this.isMuted = false;
+        }
+        init() {
+            if (this.ctx) return;
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.sfxGain = this.ctx.createGain();
+            this.sfxGain.gain.value = 0.2;
+            this.sfxGain.connect(this.ctx.destination);
+
+            // BGM 增益节点
+            this.bgmGain = this.ctx.createGain();
+            this.bgmGain.gain.value = 0.08;
+            this.bgmGain.connect(this.ctx.destination);
+        }
+
+        // 背景音乐 - 电子游戏风格循环
+        startBGM() {
+            if (!this.ctx || this.isBGMPlaying) return;
+            this.isBGMPlaying = true;
+
+            const bpm = 120;
+            const beatDuration = 60 / bpm;
+            const barDuration = beatDuration * 4;
+
+            // 基础节奏 - 低音鼓和踩镲
+            const drumPattern = [
+                { type: 'kick', time: 0 },
+                { type: 'hihat', time: beatDuration * 0.5 },
+                { type: 'hihat', time: beatDuration },
+                { type: 'kick', time: beatDuration * 1.5 },
+                { type: 'hihat', time: beatDuration * 2 },
+                { type: 'hihat', time: beatDuration * 2.5 },
+                { type: 'kick', time: beatDuration * 3 },
+                { type: 'hihat', time: beatDuration * 3.5 }
+            ];
+
+            // 主旋律音符 (C大调)
+            const melodyNotes = [
+                { note: 261.63, time: 0 },           // C4
+                { note: 329.63, time: beatDuration * 0.5 }, // E4
+                { note: 392.00, time: beatDuration },     // G4
+                { note: 329.63, time: beatDuration * 1.5 }, // E4
+                { note: 261.63, time: beatDuration * 2 },   // C4
+                { note: 392.00, time: beatDuration * 2.5 }, // G4
+                { note: 440.00, time: beatDuration * 3 },   // A4
+                { note: 392.00, time: beatDuration * 3.5 }  // G4
+            ];
+
+            const bassNotes = [
+                { note: 130.81, time: 0 },           // C3
+                { note: 130.81, time: beatDuration * 2 }  // C3
+            ];
+
+            const loopDuration = barDuration * 2;
+
+            const playLoop = () => {
+                if (!this.isBGMPlaying) return;
+
+                const startTime = this.ctx.currentTime;
+
+                // 鼓点循环
+                drumPattern.forEach(d => {
+                    const t = startTime + d.time;
+                    if (d.type === 'kick') {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(150, t);
+                        osc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+                        gain.gain.setValueAtTime(0.3, t);
+                        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                        osc.connect(gain);
+                        gain.connect(this.bgmGain);
+                        osc.start(t);
+                        osc.stop(t + 0.15);
+                    } else if (d.type === 'hihat') {
+                        const bufferSize = this.ctx.sampleRate * 0.05;
+                        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                        const noise = this.ctx.createBufferSource();
+                        noise.buffer = buffer;
+                        const filter = this.ctx.createBiquadFilter();
+                        filter.type = 'highpass';
+                        filter.frequency.value = 8000;
+                        const gain = this.ctx.createGain();
+                        gain.gain.setValueAtTime(0.08, t);
+                        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+                        noise.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(this.bgmGain);
+                        noise.start(t);
+                    }
+                });
+
+                // 旋律循环
+                melodyNotes.forEach((m, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.value = m.note;
+                    gain.gain.setValueAtTime(0, startTime + m.time);
+                    gain.gain.linearRampToValueAtTime(0.06, startTime + m.time + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + m.time + beatDuration * 0.4);
+                    osc.connect(gain);
+                    gain.connect(this.bgmGain);
+                    osc.start(startTime + m.time);
+                    osc.stop(startTime + m.time + beatDuration * 0.4);
+                });
+
+                // 低音循环
+                bassNotes.forEach(b => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = b.note;
+                    gain.gain.setValueAtTime(0.12, startTime + b.time);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + b.time + barDuration * 0.8);
+                    osc.connect(gain);
+                    gain.connect(this.bgmGain);
+                    osc.start(startTime + b.time);
+                    osc.stop(startTime + b.time + barDuration * 0.8);
+                });
+
+                // 循环
+                this.bgmTimeout = setTimeout(playLoop, loopDuration * 1000);
+            };
+
+            playLoop();
+        }
+
+        stopBGM() {
+            this.isBGMPlaying = false;
+            if (this.bgmTimeout) {
+                clearTimeout(this.bgmTimeout);
+                this.bgmTimeout = null;
+            }
+        }
+
+        playEat() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.1);
+        }
+        playKill() {
+            if (!this.ctx) return;
+            [300, 250, 200].forEach((freq, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime + i * 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.06 + 0.12);
+                osc.connect(gain);
+                gain.connect(this.sfxGain);
+                osc.start(this.ctx.currentTime + i * 0.06);
+                osc.stop(this.ctx.currentTime + i * 0.06 + 0.12);
+            });
+        }
+        playLevelUp() {
+            if (!this.ctx) return;
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.1, this.ctx.currentTime + i * 0.12);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + i * 0.12 + 0.4);
+                osc.connect(gain);
+                gain.connect(this.sfxGain);
+                osc.start(this.ctx.currentTime + i * 0.12);
+                osc.stop(this.ctx.currentTime + i * 0.12 + 0.4);
+            });
+        }
+        playDie() {
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.3);
+        }
+    }
+    const audio = new AudioManager();
+
+    // ========== 工具函数 ==========
+    const Utils = {
+        distance: (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2),
+        random: (min, max) => Math.random() * (max - min) + min,
+        lerp: (a, b, t) => a + (b - a) * t
+    };
+
+    function randomFoodType() {
+        let totalWeight = FOOD_TYPES.reduce((sum, f) => sum + f.weight, 0);
+        let r = Math.random() * totalWeight;
+        for (let i = 0; i < FOOD_TYPES.length; i++) {
+            r -= FOOD_TYPES[i].weight;
+            if (r <= 0) return FOOD_TYPES[i];
+        }
+        return FOOD_TYPES[0];
+    }
+
+    // ========== 蛇类 ==========
+    class Snake {
+        constructor(x, y, skin, speed, isPlayer) {
+            this.skin = skin;
+            this.isPlayer = isPlayer;
+            this.speed = speed;
+            this.segments = [];
+            for (let i = 0; i < INITIAL_LENGTH; i++) {
+                this.segments.push({ x: x - i * SEGMENT_SIZE, y: y });
+            }
+            this.angle = 0;
+            this.targetAngle = 0;
+            this.alive = true;
+        }
+
+        get head() { return this.segments[0]; }
+        get length() { return this.segments.length; }
+
+        setDirection(angle) {
+            this.targetAngle = angle;
+        }
+
+        update() {
+            if (!this.alive) return;
+
+            let angleDiff = this.targetAngle - this.angle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            this.angle += angleDiff * TURN_SPEED;
+
+            const head = this.head;
+            const newHead = {
+                x: head.x + Math.cos(this.angle) * this.speed,
+                y: head.y + Math.sin(this.angle) * this.speed
+            };
+
+            // 边界
+            const margin = 50;
+            if (newHead.x < margin) { newHead.x = margin; this.targetAngle = 0; }
+            if (newHead.x > MAP_SIZE - margin) { newHead.x = MAP_SIZE - margin; this.targetAngle = Math.PI; }
+            if (newHead.y < margin) { newHead.y = margin; this.targetAngle = Math.PI / 2; }
+            if (newHead.y > MAP_SIZE - margin) { newHead.y = MAP_SIZE - margin; this.targetAngle = -Math.PI / 2; }
+
+            this.segments.unshift(newHead);
+            this.segments.pop();
+        }
+
+        grow(amount) {
+            for (let i = 0; i < amount; i++) {
+                const tail = this.segments[this.segments.length - 1];
+                this.segments.push({ x: tail.x, y: tail.y });
+            }
+        }
+
+        die() { this.alive = false; }
+
+        draw(ctx, camera) {
+            if (!this.alive) return;
+            const scale = camera.scale;
+
+            // 画身体
+            for (let i = this.segments.length - 1; i >= 0; i--) {
+                const seg = this.segments[i];
+                const pos = camera.worldToScreen(seg.x, seg.y);
+                const ratio = i / Math.max(1, this.length);
+                const size = scale * SEGMENT_SIZE * (1 - ratio * 0.3);
+
+                ctx.fillStyle = i === 0 ? this.skin.headColor : this.skin.color;
+                ctx.shadowColor = this.skin.color;
+                ctx.shadowBlur = i < 4 ? 6 : 0;
+
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // 眼睛
+            const headPos = camera.worldToScreen(this.head.x, this.head.y);
+            const eyeOff = scale * SEGMENT_SIZE * 0.3;
+            const eyeSize = scale * SEGMENT_SIZE * 0.12;
+            const a1 = this.angle + 0.5;
+            const a2 = this.angle - 0.5;
+
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(headPos.x + Math.cos(a1) * eyeOff, headPos.y + Math.sin(a1) * eyeOff, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(headPos.x + Math.cos(a2) * eyeOff, headPos.y + Math.sin(a2) * eyeOff, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(headPos.x + Math.cos(a1) * eyeOff * 1.1, headPos.y + Math.sin(a1) * eyeOff * 1.1, eyeSize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(headPos.x + Math.cos(a2) * eyeOff * 1.1, headPos.y + Math.sin(a2) * eyeOff * 1.1, eyeSize * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // ========== AI蛇 ==========
+    class AISnake extends Snake {
+        constructor(x, y, skin, speed, player) {
+            super(x, y, skin, speed, false);
+            this.player = player;
+            this.wanderAngle = Math.random() * Math.PI * 2;
+            this.wanderTimer = 0;
+        }
+
+        findTarget(foods) {
+            if (!this.alive) return null;
+
+            this.wanderTimer++;
+            if (this.wanderTimer > 120) {
+                this.wanderAngle += (Math.random() - 0.5) * 1.0;
+                this.wanderTimer = 0;
+            }
+
+            if (Math.random() < 0.25) {
+                return {
+                    x: this.head.x + Math.cos(this.wanderAngle) * 200,
+                    y: this.head.y + Math.sin(this.wanderAngle) * 200
+                };
+            }
+
+            let nearest = null, nearestDist = Infinity;
+            for (const f of foods) {
+                const d = Utils.distance(this.head.x, this.head.y, f.x, f.y);
+                if (d < nearestDist) { nearestDist = d; nearest = f; }
+            }
+
+            if (this.player && this.player.alive && this.player.length > this.length) {
+                const pd = Utils.distance(this.head.x, this.head.y, this.player.head.x, this.player.head.y);
+                if (pd < 150) {
+                    return { x: this.head.x * 2 - this.player.head.x, y: this.head.y * 2 - this.player.head.y };
+                }
+            }
+
+            if (this.player && this.player.alive && this.length > this.player.length) {
+                const pd = Utils.distance(this.head.x, this.head.y, this.player.head.x, this.player.head.y);
+                if (pd < 200 && Math.random() < 0.3) {
+                    return { x: this.player.head.x, y: this.player.head.y };
+                }
+            }
+
+            return nearest ? { x: nearest.x, y: nearest.y } : null;
+        }
+
+        updateAI(foods) {
+            if (!this.alive) return;
+            const target = this.findTarget(foods);
+            if (target) {
+                const angle = Math.atan2(target.y - this.head.y, target.x - this.head.x);
+                this.targetAngle = angle + (Math.random() - 0.5) * 0.4;
+            }
+            super.update();
+        }
+    }
+
+    // ========== 相机 ==========
+    class Camera {
+        constructor(canvas) {
+            this.canvas = canvas;
+            this.x = MAP_SIZE / 2;
+            this.y = MAP_SIZE / 2;
+            this.scale = VIEW_SCALE;
+        }
+        follow(target) {
+            this.x = Utils.lerp(this.x, target.x, 0.1);
+            this.y = Utils.lerp(this.y, target.y, 0.1);
+        }
+        worldToScreen(wx, wy) {
+            const w = this.canvas.width, h = this.canvas.height;
+            return {
+                x: (wx - this.x) * this.scale + w / 2,
+                y: (wy - this.y) * this.scale + h / 2
+            };
+        }
+    }
+
+    // ========== 游戏 ==========
+    class Game {
+        constructor() {
+            this.canvas = document.getElementById('gameCanvas');
+            this.ctx = this.canvas.getContext('2d');
+            this.resize();
+            window.addEventListener('resize', () => this.resize());
+
+            this.keys = {};
+            window.addEventListener('keydown', e => {
+                this.keys[e.key.toLowerCase()] = true;
+                if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key)) e.preventDefault();
+            });
+            window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
+
+            this.touchStartX = 0;
+            this.touchStartY = 0;
+            this.canvas.addEventListener('touchstart', e => {
+                e.preventDefault();
+                audio.init();
+                this.touchStartX = e.touches[0].clientX;
+                this.touchStartY = e.touches[0].clientY;
+            });
+            this.canvas.addEventListener('touchmove', e => {
+                e.preventDefault();
+                if (!this.player || !this.player.alive) return;
+                const dx = e.touches[0].clientX - this.touchStartX;
+                const dy = e.touches[0].clientY - this.touchStartY;
+                if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                    this.player.setDirection(Math.atan2(dy, dx));
+                }
+            });
+
+            this.canvas.addEventListener('click', e => {
+                if (!this.player || !this.player.alive) return;
+                const rect = this.canvas.getBoundingClientRect();
+                const dx = e.clientX - rect.left - this.canvas.width / 2;
+                const dy = e.clientY - rect.top - this.canvas.height / 2;
+                this.player.setDirection(Math.atan2(dy, dx));
+            });
+
+            this.updateStartScreen();
+        }
+
+        resize() {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+        }
+
+        updateStartScreen() {
+            document.getElementById('maxLevelDisplay').textContent = saveData.maxLevel + 1;
+            document.getElementById('highScoreDisplay').textContent = saveData.highScore;
+
+            // 生成关卡按钮
+            const container = document.getElementById('levelButtons');
+            container.innerHTML = '';
+            for (let i = 0; i < LEVELS.length; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'level-btn';
+                btn.textContent = i + 1;
+                if (i <= saveData.maxLevel) {
+                    btn.classList.add('unlocked');
+                    btn.onclick = () => this.selectLevel(i);
+                } else {
+                    btn.classList.add('locked');
+                }
+                container.appendChild(btn);
+            }
+
+            // 显示选中的关卡
+            this.selectedLevel = this.selectedLevel || 0;
+            this.updateLevelButtons();
+        }
+
+        updateLevelButtons() {
+            const buttons = document.querySelectorAll('.level-btn');
+            buttons.forEach((btn, i) => {
+                btn.classList.remove('selected');
+                if (i === this.selectedLevel) btn.classList.add('selected');
+            });
+        }
+
+        selectLevel(level) {
+            if (level > saveData.maxLevel) return;
+            this.selectedLevel = level;
+            this.updateLevelButtons();
+        }
+
+        resetSave() {
+            if (!confirm('确定要重置所有进度吗？')) return;
+            saveData = { version: 1, maxLevel: 0, highScore: 0 };
+            saveGame(saveData);
+            this.selectedLevel = 0;
+            this.updateStartScreen();
+        }
+
+        start() {
+            audio.init();
+            audio.startBGM();
+            this.currentLevel = this.selectedLevel !== undefined ? this.selectedLevel : saveData.maxLevel;
+            this.initLevel();
+            document.getElementById('startScreen').classList.add('hidden');
+            this.running = true;
+            this.lastTime = performance.now();
+            requestAnimationFrame(t => this.loop(t));
+        }
+
+        initLevel() {
+            const cfg = LEVELS[this.currentLevel] || LEVELS[0];
+            this.cfg = cfg;
+            this.camera = new Camera(this.canvas);
+            this.foods = [];
+            this.snakes = [];
+            this.score = 0;
+            // 从存档恢复生命值
+            this.lives = saveData.lives || MAX_LIVES;
+
+            // 食物
+            for (let i = 0; i < 80; i++) {
+                const t = randomFoodType();
+                this.foods.push({ x: Utils.random(60, MAP_SIZE - 60), y: Utils.random(60, MAP_SIZE - 60), type: t });
+            }
+
+            // 玩家
+            const skin = SNAKE_SKINS[this.currentLevel % SNAKE_SKINS.length];
+            this.player = new Snake(MAP_SIZE / 2, MAP_SIZE / 2, skin, cfg.speed, true);
+            this.snakes.push(this.player);
+
+            // AI
+            this.spawnAI();
+            this.lastAISpawn = Date.now();
+
+            this.updateUI();
+        }
+
+        spawnAI() {
+            const skin = SNAKE_SKINS[Math.floor(Math.random() * SNAKE_SKINS.length)];
+            const ai = new AISnake(
+                Utils.random(200, MAP_SIZE - 200),
+                Utils.random(200, MAP_SIZE - 200),
+                skin,
+                this.cfg.speed,
+                this.player
+            );
+            ai.setDirection(Math.random() * Math.PI * 2);
+            this.snakes.push(ai);
+        }
+
+        loop(timestamp) {
+            if (!this.running) return;
+            const dt = Math.min((timestamp - this.lastTime) / 16.67, 2);
+            this.lastTime = timestamp;
+
+            this.update(dt);
+            this.render();
+            requestAnimationFrame(t => this.loop(t));
+        }
+
+        update(dt) {
+            if (!this.player || !this.player.alive) return;
+
+            // 输入
+            let targetAngle = this.player.angle;
+            if (this.keys['arrowup'] || this.keys['w']) targetAngle = -Math.PI / 2;
+            else if (this.keys['arrowdown'] || this.keys['s']) targetAngle = Math.PI / 2;
+            else if (this.keys['arrowleft'] || this.keys['a']) targetAngle = Math.PI;
+            else if (this.keys['arrowright'] || this.keys['d']) targetAngle = 0;
+
+            if (this.keys['arrowup'] || this.keys['w'] || this.keys['arrowdown'] || this.keys['s'] ||
+                this.keys['arrowleft'] || this.keys['a'] || this.keys['arrowright'] || this.keys['d']) {
+                this.player.setDirection(targetAngle);
+            }
+
+            // 更新蛇
+            for (const s of this.snakes) {
+                if (s instanceof AISnake) s.updateAI(this.foods);
+                else if (s.isPlayer) s.update();
+            }
+
+            // AI生成
+            if (Date.now() - this.lastAISpawn > this.cfg.aiSpawnInterval) {
+                const aliveAI = this.snakes.filter(s => !s.isPlayer && s.alive).length;
+                if (aliveAI < this.cfg.aiCount) this.spawnAI();
+                this.lastAISpawn = Date.now();
+            }
+
+            // 食物碰撞
+            for (const s of this.snakes) {
+                if (!s.alive) continue;
+                for (let i = this.foods.length - 1; i >= 0; i--) {
+                    const f = this.foods[i];
+                    if (Utils.distance(s.head.x, s.head.y, f.x, f.y) < SEGMENT_SIZE * 1.2) {
+                        this.foods.splice(i, 1);
+                        s.grow(1 + Math.floor(f.type.score / 8));
+                        this.score += f.type.score;
+                        audio.playEat();
+                        const t = randomFoodType();
+                        this.foods.push({ x: Utils.random(60, MAP_SIZE - 60), y: Utils.random(60, MAP_SIZE - 60), type: t });
+                    }
+                }
+            }
+
+            // 蛇碰撞
+            for (let i = 0; i < this.snakes.length; i++) {
+                const a = this.snakes[i];
+                if (!a.alive) continue;
+                for (let j = 0; j < this.snakes.length; j++) {
+                    if (i === j) continue;
+                    const b = this.snakes[j];
+                    if (!b.alive) continue;
+
+                    // 头碰头
+                    const dist = Utils.distance(a.head.x, a.head.y, b.head.x, b.head.y);
+                    if (dist < SEGMENT_SIZE * 1.3) {
+                        if (a.length < b.length) {
+                            a.die();
+                            if (a.isPlayer) audio.playDie();
+                            else { audio.playKill(); b.grow(Math.floor(a.length * 0.6)); }
+                        } else if (b.length < a.length) {
+                            b.die();
+                            if (b.isPlayer) audio.playDie();
+                            else { audio.playKill(); a.grow(Math.floor(b.length * 0.6)); }
+                        } else {
+                            b.die();
+                            audio.playKill();
+                        }
+                    }
+
+                    // 头碰身体
+                    for (let k = 4; k < b.segments.length; k++) {
+                        if (Utils.distance(a.head.x, a.head.y, b.segments[k].x, b.segments[k].y) < SEGMENT_SIZE * 0.7) {
+                            if (a.isPlayer && !b.isPlayer) {
+                                a.die();
+                                audio.playDie();
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 相机
+            this.camera.follow(this.player.head);
+
+            // 过关
+            if (this.player.alive && this.player.length >= this.cfg.targetLength) {
+                this.levelComplete();
+                return;
+            }
+
+            // 死亡
+            if (this.player && !this.player.alive) {
+                this.gameOver();
+                return;
+            }
+
+            this.updateUI();
+        }
+
+        levelComplete() {
+            this.running = false;
+            audio.playLevelUp();
+            if (this.score > saveData.highScore) saveData.highScore = this.score;
+            if (this.currentLevel >= saveData.maxLevel) saveData.maxLevel = this.currentLevel + 1;
+
+            // 过关增加进度计数
+            saveData.levelsSinceLife = (saveData.levelsSinceLife || 0) + 1;
+            // 每连续过5关，增加一条命
+            if (saveData.levelsSinceLife >= 5 && this.lives < MAX_LIVES) {
+                this.lives++;
+                saveData.lives = this.lives;
+                saveData.levelsSinceLife = 0;
+            }
+            saveGame(saveData);
+
+            document.getElementById('levelCompleteInfo').textContent = `长度: ${this.player.length} | 得分: ${this.score}`;
+            document.getElementById('levelCompleteScreen').classList.remove('hidden');
+        }
+
+        nextLevel() {
+            document.getElementById('levelCompleteScreen').classList.add('hidden');
+            this.currentLevel++;
+            if (this.currentLevel >= LEVELS.length) {
+                // 全部通关，显示胜利界面
+                this.running = false;
+                audio.playLevelUp();
+                if (this.score > saveData.highScore) saveData.highScore = this.score;
+                if (this.currentLevel > saveData.maxLevel) saveData.maxLevel = this.currentLevel;
+                saveGame(saveData);
+                document.getElementById('finalScore').innerHTML = '🎉 全部通关!';
+                document.getElementById('finalLength').textContent = `最终长度: ${this.player.length}`;
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+                return;
+            }
+            this.initLevel();
+            this.running = true;
+            this.lastTime = performance.now();
+            requestAnimationFrame(t => this.loop(t));
+        }
+
+        showVictory() {
+            document.getElementById('finalScore').textContent = '🎉 全部通关!';
+            document.getElementById('finalLength').textContent = `最终长度: ${this.player.length}`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        gameOver() {
+            this.running = false;
+            audio.playDie();
+
+            // 消耗生命值
+            this.lives--;
+            saveData.lives = this.lives;
+            saveData.levelsSinceLife = 0;
+            saveGame(saveData);
+
+            if (this.score > saveData.highScore) saveData.highScore = this.score;
+            saveGame(saveData);
+
+            if (this.lives <= 0) {
+                // 生命耗尽，回到关卡1，重置生命
+                this.lives = MAX_LIVES;
+                saveData.lives = MAX_LIVES;
+                saveData.levelsSinceLife = 0;
+                saveData.maxLevel = 0;
+                saveGame(saveData);
+                document.getElementById('finalScore').textContent = `分数: ${this.score}`;
+                document.getElementById('finalLength').textContent = `生命耗尽，回到关卡1`;
+                document.getElementById('retryBtn').style.display = 'none';
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+            } else {
+                // 还有生命，继续当前关卡
+                document.getElementById('finalScore').innerHTML = `生命耗尽!<br>剩余 ${this.lives} 条命`;
+                document.getElementById('finalLength').textContent = '继续挑战本关';
+                document.getElementById('retryBtn').style.display = 'inline-block';
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+            }
+        }
+
+        restart() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            this.currentLevel = 0;
+            this.lives = MAX_LIVES;
+            saveData.lives = MAX_LIVES;
+            saveData.levelsSinceLife = 0;
+            saveData.maxLevel = 0;
+            saveGame(saveData);
+            this.start();
+        }
+
+        continueLevel() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            this.initLevel();
+            this.running = true;
+            this.lastTime = performance.now();
+            requestAnimationFrame(t => this.loop(t));
+        }
+
+        returnToMenu() {
+            audio.stopBGM();
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('levelCompleteScreen').classList.add('hidden');
+            this.updateStartScreen();
+            document.getElementById('startScreen').classList.remove('hidden');
+        }
+
+        toggleMute() {
+            if (!audio.ctx) {
+                audio.init();
+            }
+            if (audio.isMuted) {
+                audio.isMuted = false;
+                audio.sfxGain.gain.value = 0.2;
+                audio.bgmGain.gain.value = 0.08;
+                document.getElementById('muteBtn').textContent = '🔊';
+                document.getElementById('muteBtn').classList.remove('muted');
+                if (!audio.isBGMPlaying) audio.startBGM();
+            } else {
+                audio.isMuted = true;
+                audio.sfxGain.gain.value = 0;
+                audio.bgmGain.gain.value = 0;
+                audio.stopBGM();
+                document.getElementById('muteBtn').textContent = '🔇';
+                document.getElementById('muteBtn').classList.add('muted');
+            }
+        }
+
+        render() {
+            const ctx = this.ctx;
+            const w = this.canvas.width, h = this.canvas.height;
+
+            // 背景
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, w, h);
+
+            // 网格
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 1;
+            const gridSize = 60;
+            const scale = this.camera.scale;
+            const startX = Math.floor((this.camera.x - w / 2 / scale) / gridSize) * gridSize;
+            const endX = startX + w / scale + gridSize * 2;
+            const startY = Math.floor((this.camera.y - h / 2 / scale) / gridSize) * gridSize;
+            const endY = startY + h / scale + gridSize * 2;
+
+            for (let x = startX; x < endX; x += gridSize) {
+                const sx = (x - this.camera.x) * scale + w / 2;
+                ctx.beginPath();
+                ctx.moveTo(sx, 0);
+                ctx.lineTo(sx, h);
+                ctx.stroke();
+            }
+            for (let y = startY; y < endY; y += gridSize) {
+                const sy = (y - this.camera.y) * scale + h / 2;
+                ctx.beginPath();
+                ctx.moveTo(0, sy);
+                ctx.lineTo(w, sy);
+                ctx.stroke();
+            }
+
+            // 食物
+            for (const f of this.foods) {
+                const pos = this.camera.worldToScreen(f.x, f.y);
+                const size = scale * f.type.size;
+                ctx.shadowColor = f.type.color;
+                ctx.shadowBlur = 6;
+                ctx.fillStyle = f.type.color;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // 蛇
+            for (const s of this.snakes) {
+                if (!s.isPlayer) s.draw(ctx, this.camera);
+            }
+            if (this.player) this.player.draw(ctx, this.camera);
+        }
+
+        updateUI() {
+            document.getElementById('score').textContent = this.score;
+            document.getElementById('levelDisplay').textContent = this.currentLevel + 1;
+            document.getElementById('length').textContent = this.player ? this.player.length : INITIAL_LENGTH;
+
+            // 显示生命值
+            const hearts = '❤️'.repeat(this.lives) + '🖤'.repeat(MAX_LIVES - this.lives);
+            document.getElementById('lives').textContent = hearts;
+
+            const target = this.cfg ? this.cfg.targetLength : INITIAL_LENGTH * 3;
+            const prog = Math.min(100, (this.player ? this.player.length : INITIAL_LENGTH) / target * 100);
+            document.getElementById('progressFill').style.width = prog + '%';
+            document.getElementById('progressText').textContent = `长度 ${this.player ? this.player.length : INITIAL_LENGTH} / ${target}`;
+        }
+
+        // 显示生命值（用于UI更新）
+        updateLives() {
+            const hearts = '❤️'.repeat(this.lives) + '🖤'.repeat(MAX_LIVES - this.lives);
+            document.getElementById('lives').textContent = hearts;
+        }
+    }
+
+    const game = new Game();
+    </script>
+</body>
+</html>
