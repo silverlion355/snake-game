@@ -848,12 +848,18 @@
                 const dy = e.changedTouches[0].clientY - this.swipeStartY;
                 const dt = Date.now() - this.swipeStartTime;
                 // 右滑超过100px且时间少于300ms
-                if (dx > 100 && dt < 300 && this.running) {
+                if (dx > 100 && dt < 300 && !this.showingScreen) {
                     this.confirmExit();
                 }
             }, { passive: true });
 
             this.updateStartScreen();
+        }
+
+        get showingScreen() {
+            return !document.getElementById('startScreen').classList.contains('hidden') ||
+                   !document.getElementById('gameOverScreen').classList.contains('hidden') ||
+                   !document.getElementById('levelCompleteScreen').classList.contains('hidden');
         }
 
         resize() {
@@ -1200,6 +1206,15 @@
         }
 
         confirmExit() {
+            if (!this.running && !document.getElementById('levelCompleteScreen').classList.contains('hidden')) {
+                // 游戏中返回手势
+                this.running = false;
+                this.pendingAction = 'menu';
+                document.getElementById('dialogTitle').textContent = '返回主菜单';
+                document.getElementById('dialogMessage').textContent = '确定要退出游戏回到主菜单吗？';
+                document.getElementById('confirmDialog').classList.remove('hidden');
+                return;
+            }
             if (!this.running) return;
             this.running = false;
             this.pendingAction = 'menu';
@@ -1210,18 +1225,22 @@
 
         closeDialog() {
             document.getElementById('confirmDialog').classList.add('hidden');
-            if (this.pendingAction) {
+            // 取消对话框后恢复游戏
+            if (this.pendingAction === 'menu' && this.player && this.player.alive) {
                 this.running = true;
                 this.pendingAction = null;
+                this.lastTime = performance.now();
+                requestAnimationFrame(t => this.loop(t));
             }
+            this.pendingAction = null;
         }
 
         confirmDialogAction() {
             document.getElementById('confirmDialog').classList.add('hidden');
-            audio.stopBGM();
-            this.pendingAction = null;
 
             if (this.pendingAction === 'menu') {
+                audio.stopBGM();
+                this.pendingAction = null;
                 document.getElementById('gameOverScreen').classList.add('hidden');
                 document.getElementById('levelCompleteScreen').classList.add('hidden');
                 this.updateStartScreen();
